@@ -24,17 +24,15 @@ def UI():
     """
     
     return Javascript("""
-    
-    function sweep_select() {
-        return $('<div>').attr('align','right').addClass('span3').text('Type of Sweep:')
-                .append($('<select/>').addClass('span3 switch-box').addClass('sweep_type')
-                    .append(($('<option>').val('noFreq').text('No Sweep')))
-                    .append(($('<option>').val('regFreq').text('Regular Frequency Sweep')))
-                    .append(($('<option>').val('logFreq').text('Log Frequency Sweep')))
-                    .append(($('<option>').val('regVolt').text('Voltage Bias Sweep')))
-                    .append(($('<option>').val('custsweep').text('Custom Sweep'))));           
-    }
-    
+
+    /*
+    This Code uses JQuery in an IPython notebook to create a UI for the HP 4192A LF
+    impedance analyzer. 
+
+    Created by: Zach Sailer
+
+    */
+
     function switch_box(name, variable) {
         return $('<div>').attr('align','right').addClass('span3').text(name+': ')
                 .append($('<select/>').addClass('span3 switch-box').addClass(variable)
@@ -43,16 +41,24 @@ def UI():
     }
 
     function select_box(name, item, variable, len) {
-        var box = $('<div>').attr('align','right').addClass('span3').text(name+': ')
+        var box = $('<div>').attr('align','right').addClass('span3').text(name+': ').addClass(item+'div')
         var select = $('<select>').addClass('span3 select-box').addClass(item)
         for (var i=0;i<len;i++) {
             select = select.append($('<option>')
-            .val('panel["'+ item + '"]='+variable[i]).text(variable[i]))
+            .val('panel["'+ item + '"]="'+variable[i]+'"').text(variable[i]))
         };
         return box.append(select);
     };
 
-    function reg_sweep(item, settings){
+    function osc_level() {
+        var form = $('<form>').addClass('span3').attr('align', 'right')
+        var field = $('<fieldset>')
+                    .append('<label>Oscillation Level:</label>')
+                    .append('<input class="osc_level">').attr('type','text')
+        return form.append(field)
+    };
+
+    function reg_sweep(item, settings) {
         var form = $('<form>').addClass('span4')
         var field = $('<fieldset>')
                     .append('<legend>'+item+' Sweep</legend>')
@@ -62,18 +68,65 @@ def UI():
                     .append('<input class="stop_'+item+'">').attr('type','text')
                     .append('<label>Step '+item+'</label>')
                     .append('<input class="step_'+item+'">').attr('type','text')
-        return $('<div>').addClass('sweep_div').append(form.append(field)).append(run_button(settings, item))
+        return $('<div>').addClass('sweep_div').append(form.append(field)).append(run_button(settings, true, item))
     };
 
-    function no_sweep(settings){
-        var form = $('<form>').addClass('span4')
-        var field = $('<fieldset>')
-                    .append('<label>Test Frequency:</label>')
-                    .append('<input class="start_frequency">').attr('type','text')
-        return $('<div>').addClass('sweep_div').append(form.append(field)).append(run_button(settings, false))
+    function sweep_select(settings) {
+        return $('<div>').attr('align','right').addClass('span3').text('Type of Sweep:')
+                .append($('<select/>').addClass('span3 switch-box').addClass('sweep_type')
+                    .append(($('<option>').val('noFreq').text('No Sweep')))
+                    .append(($('<option>').val('regFreq').text('Regular Frequency Sweep')))
+                    .append(($('<option>').val('logFreq').text('Log Frequency Sweep')))
+                    .append(($('<option>').val('regVolt').text('Voltage Bias Sweep')))
+                    .append(($('<option>').val('custsweep').text('Custom Sweep')))
+                    .change(function(){
+                        var sel = $('.sweep_type').val();
+                        if (sel == 'regFreq') {
+                            $('.sweep_div').replaceWith(reg_sweep('Frequency', settings));
+                        }
+                        else if (sel == 'noFreq') {
+                            $('.sweep_div').replaceWith(no_sweep(settings));
+                        }
+                        else if (sel == 'regVolt') {
+                            $('.sweep_div').replaceWith(reg_sweep('Voltage',settings));
+                        }
+                        else if (sel == 'logFreq') {
+                            $('.sweep_div').replaceWith(log_sweep(settings));
+                        }
+                        else if (sel == 'custsweep') {
+                            $('.sweep_div').replaceWith($('<div>').addClass('sweep_div').append(run_button(settings, null, null)));
+                        }
+                    })
+                );
     };
-    
-    function log_sweep(settings){
+
+    function no_sweep(settings) {
+        return $('<div>').attr('align','right').addClass('sweep_div span3').text('Type of test measurement:')
+                .append($('<select/>').addClass('span3 switch-box').addClass('test_type')
+                    .append(($('<option>').val('freq').text('Frequency')))
+                    .append(($('<option>').val('volt').text('Voltage'))))
+                    .append(test_select('Frequency',settings))
+                    .change(function(){
+                        // Changes between test voltage and frequency forms
+                        var sel = $('.test_type').val();
+                        if (sel == 'freq') {
+                            $('.test_div').replaceWith(test_select('Frequency', settings));
+                        }
+                        else if (sel == 'volt') {
+                            $('.test_div').replaceWith(test_select('Voltage', settings));
+                        }
+                    });
+    };
+
+    function test_select(item, settings) {
+        var form = $('<form>').addClass('span2').attr('align', 'center')
+        var field = $('<fieldset>')
+                    .append('<label>Test '+item+' Value:</label>')
+                    .append('<input class="start_'+item+'">').attr('type','text')
+        return $('<div>').addClass('test_div').append(form.append(field)).append(run_button(settings, false, item))
+    };
+
+    function log_sweep(settings) {
         var form = $('<form>').addClass('span4')
         var field = $('<fieldset>')
                     .append('<legend>Log Frequency Sweep</legend>')
@@ -83,7 +136,7 @@ def UI():
                     .append('<input class="stop_frequency">').attr('type','text')
                     .append('<label>Number of Points in Decade</label>')
                     .append('<input class="step_frequency">').attr('type','text')
-        return $('<div>').addClass('sweep_div').append(form.append(field)).append(run_button(settings, 'Frequency'))
+        return $('<div>').addClass('sweep_div').append(form.append(field)).append(run_button(settings, true, 'Frequency'))
     };
 
     function status() {
@@ -91,12 +144,11 @@ def UI():
                 .addClass('progress')
                 .append($('<div>').addClass('bar progress-bar')
                 .css('width','1%'));
-
     };
 
-    function run_button(settings, sweep) {
+    function run_button(settings, sweep, sweep_type) {
         return $('<div>').addClass('span12 button_div')
-                .append($('<button>').addClass('span2 run-button')
+                .append($('<button>').addClass('span2 run-button').attr('align','left')
                 .addClass('btn btn-primary').text('Run')
                 .click(function(){
                     // sends all JS settings to kernel and converts them
@@ -106,25 +158,30 @@ def UI():
                         var value = $(settings[i]).val()
                         IPython.notebook.kernel.execute(value)
                     };
-                
+                    IPython.notebook.kernel.execute('panel["osc_level"]='+$('.osc_level').val())
                     // set the start, stop, and step frequency to 
-                    // python variables
+                    // python dictionary
+                    console.log(sweep)
                     if (sweep == false) {
-                        var start = $('.start_'+sweep).val()
-                        IPython.notebook.kernel.execute('start='+start)
+                        console.log('.start_'+sweep_type)
+                        var start = $('.start_'+sweep_type).val()
+                        console.log(start)
+                        IPython.notebook.kernel.execute('sweep["start"]='+start)
+                        IPython.notebook.kernel.execute('sweep["sweep_type"]="'+sweep_type+'"')
+                        IPython.notebook.kernel.execute('sweep_data=test_measurement(sweep)');
                     }
                     else if (sweep == null){}
                     else {
-                        var start = $('.start_'+sweep).val()
-                        var stop = $('.stop_'+sweep).val()
-                        var step = $('.step_'+sweep).val()
-                        IPython.notebook.kernel.execute('start='+start)
-                        IPython.notebook.kernel.execute('stop='+stop)
-                        IPython.notebook.kernel.execute('step='+step)
-                        var gap = stop-start;
-                        IPython.notebook.kernel.execute('sweep_data,it=freq_range(start,stop,step)');
+                        var start = $('.start_'+sweep_type).val()
+                        var stop = $('.stop_'+sweep_type).val()
+                        var step = $('.step_'+sweep_type).val()
+                        IPython.notebook.kernel.execute('sweep["start"]='+start)
+                        IPython.notebook.kernel.execute('sweep["stop"]='+stop)
+                        IPython.notebook.kernel.execute('sweep["step"]='+step)
+                        IPython.notebook.kernel.execute('sweep["sweep_type"]="'+sweep_type+'"')
+                        IPython.notebook.kernel.execute('sweep_data,it=sweep_message(sweep)');
                     };
-                
+
                     // grab the front panel settings in python and convert
                     // them to a message for the impedance analyzer
                     IPython.notebook.kernel.execute('pre_mess=grab_settings(panel)');
@@ -132,44 +189,38 @@ def UI():
                     }));
     };
 
-    var settings = ['.displayA','.displayB','.circuit','.trigger',
-                    '.sweep','.dcbias','.sweep_mode','.append']
+    /*
+        This requires a webpage to have a div with id='AnalyzerUI' to build the UI.
+    */
+
+    var settings = ['.displayA','.displayB','.circuit','.trigger','.dcbias']
 
     $('#AnalyzerUI').append('<h3>Impedance Analyzer:</h3>')
-        .append(sweep_select())
-        .append(select_box('Display A', 'displayA', ['"Z/Y"','"R/G"','"L"','"C"'], 4))
-        .append(select_box('Display B', 'displayB', ['"Rad"','"Deg"','"C"'], 3))
-        .append(select_box('Ciruit Mode', 'circuit', ['"Parallel"', '"Series"', '"Auto"'], 3))
-        .append(select_box('Trigger', 'trigger', ['"Hold/Manual"', '"External"', '"Internal"'], 3))
-        .append(switch_box('Sweep','sweep'))
+        .append(sweep_select(settings))
+        .append(select_box('Display A', 'displayA', ['Z/Y','R/G','L','C'], 4))
+        .append(select_box('Display B', 'displayB', ['Rad','Deg'], 2))
+        .append(select_box('Ciruit Mode', 'circuit', ['Auto', 'Parallel', 'Series'], 3))
+        .append(select_box('Trigger', 'trigger', ['Hold/Manual', 'External', 'Internal'], 3))
         .append(switch_box('DC Bias','dcbias'))
-        .append(select_box('Sweep mode', 'sweep_mode', ['"Frequency"', '"Voltage Bias"', '"Custom"'], 3))
         .append(switch_box('Append file','append'))
+        .append(osc_level())
         .append($('<div>').addClass('span10').addClass('sweep_settings'))
-        .append($('<div>').addClass('sweep_div').append(no_sweep(settings)))
-        
-    $('.sweep_type').change(function(){
-        var sel = $('.sweep_type').val();
-        if (sel == 'regFreq') {
-            $('.sweep_div').replaceWith(reg_sweep('Frequency', settings));
-        }
-        else if (sel == 'noFreq') {
-            $('.sweep_div').replaceWith(no_sweep(settings));
-        }
-        else if (sel == 'regVolt') {
-            $('.sweep_div').replaceWith(reg_sweep('Voltage',settings));
-        }
-        else if (sel == 'logFreq') {
-            $('.sweep_div').replaceWith(log_sweep(settings));
-        }
-        else if (sel == 'custsweep') {
-            $('.sweep_div').replaceWith($('<div>').addClass('sweep_div').append(run_button(settings, null)));
+        .append(no_sweep(settings))
 
+    $('.displayA').change(function() {
+        var sel = $('.displayA').val();
+        if (sel == 'panel["displayA"]="Z/Y"' || sel == 'panel["displayA"]="R/G"') {
+            $('.displayBdiv').replaceWith(select_box('Display B', 'displayB', ['Rad','Deg'], 2))
+        } else if (sel == 'panel["displayA"]="L"' || sel == 'panel["displayA"]="C"') {
+            $('.displayBdiv').replaceWith(select_box('Display B', 'displayB', ['Q','D','R/G'], 3))
         }
-    })
+
+    });
+
     """)
 
 panel={}
+sweep={}
 
 settings = dict(
     displayA = {'Z/Y':'A1,',
@@ -205,54 +256,107 @@ settings = dict(
                     'Voltage Bias': '',
                     'Custom': ''},
     append = {'On': '',
-                'Off': ''}
+                'Off': ''},
+    osc_level = {}
     )
 
 
-def freq_range(start, stop, steps):
+def sweep_message(sweep):
     """Creates and returns the string to send
-    to the impedance analyzer for frequency sweeps.
+    to the impedance analyzer for sweeps.
 
     Parameters
     ----------
-    start: float
-        starting frequency for a frequency sweep.
-    stop: float
-        frequency for the sweep to stop at.
-    step: float
-        the step between each frequency measurement.
+    sweep: dict
+        This dictionary holds all necessary information
+        for a sweep.
+        parameters:
+            start: float
+                starting value for the sweep
+            stop: float
+                stopping value for the sweep
+            step: float
+                the step size for each iteration
+            sweep_type: str
+                the type of sweep ('Frequency', 'Voltage')
 
     Returns
     -------
-    freq: str
-        string for frequency sweep.
+    message: str
+        message string to commmunicate to the analyzer.
     iteration: int
-        number of frequency iterations.
+        number of iterations in the sweep.
     """
-    start= float(start)
-    stop = float(stop)
-    steps = float(steps)
-    freq = "AB,W1,TF%.6fEN,PF%.6fEN,SF%.6fEN,G0,W2," %(start,stop,steps)
-    iteration = int((stop - start)/steps)
-    return freq, iteration
+    start = float(sweep['start'])
+    stop = float(sweep['stop'])
+    step = float(sweep['step'])
+    if sweep['sweep_type'] == 'Frequency':
+        message = "AB,W1,TF%.6fEN,PF%.6fEN,SF%.6fEN,G0,W2," %(start,stop,step)
+    if sweep['sweep_type'] == 'Voltage':
+        message = "AB,W1,TB%.2fEN,PB%.2fEN,SB%.2fEN,G0,W2," %(start,stop,step)
+    iteration = int((stop - start)/step)
+    return message, iteration
+
+def test_measurement(sweep):
+    """Creates and returns the string to send
+    to the impedance analyzer for test measurements.
+
+    Parameters
+    ----------
+    test_data: dict
+        This dictionary holds all necessary information
+        for a sweep.
+        parameters:
+            start: float
+                starting value for the sweep
+            sweep_type: str
+                the type of sweep ('Frequency', 'Voltage')
+    Returns
+    -------
+    message: str
+        message string to commmunicate to the analyzer.
+    """
+    start = float(sweep['start'])
+    if sweep['sweep_type'] == 'Frequency':
+        message = "FR%.6fEN," %(start)
+    if sweep['sweep_type'] == 'Voltage':
+        message = "BI%.2fEN," %(start)
+    return message
 
 def grab_settings(panel):
     """Takes a dictionary containing the settings for
     the front panel of an HP4192A LF impedance analyzer
-    and returns an concatenated messaging string to be 
+    and returns an concatenated string message to be 
     written to the machine.
+    Parameters
+    ----------
+        panel: dict
+            dict of all the desired settings for the analyzer.
+            
+    Returns
+    -------
+        message: str
+            A message string that contains the appropriate
+            syntax for the analyzer.
     """
     message = ''
     for p in panel:
-        message+= settings[p][panel[p]]
+        if p != 'osc_level':
+            message+= settings[p][panel[p]]
+    message += "OL%.3fEN," %float(panel['osc_level'])
     return message
 
-def message_to_analyzer(frequency, *args):
+def message_to_analyzer(frequency='', *args):
+    """Concatenates the full string message (with 
+    sweep information) to send to the analyzer"""
     pre = "RL1,D1,R8,F1,%s" %args
-    message = pre + frequency +'EX'
+    message = pre + frequency + 'EX'
     return message
 
 def read_message(message, C=False):
+    """Parses the response message (must be given) from the 
+    analyzer and returns the values for display A, display B,
+    and (if C=True) display C"""
     A = message[4:15]
     B = message[20:31]
     if C is True:
@@ -261,7 +365,27 @@ def read_message(message, C=False):
     else:
         return A,B
 
-def regular_sweep(instr):
+def regular_sweep(instr, panel, sweep):
+    """Runs a standard sweep with the analyzer.
+    
+    Parameters
+    ----------
+        instr:
+            The VISA instrument object for the 
+            impedance analyzer
+        sweep: dict
+            The dictionary that holds all settings
+            for the sweep. (see 'sweep_message docs')
+    Returns
+    -------
+        A: list
+            The values for display A from the sweep.
+        B: list
+            The values for display B from the sweep.
+    """
+    message = grab_settings(panel)
+    sweep, i = sweep_message(sweep)
+    message = message_to_analyzer(sweep, message)
     instr.write(message)
     A = []
     B = []
@@ -270,6 +394,7 @@ def regular_sweep(instr):
         displays = read_message(m,False)
         A.append(displays[0])
         B.append(displays[1])
+    return A, B
 
 def log_sweep_plot(n, first_decade, last_decade):
     A = []
