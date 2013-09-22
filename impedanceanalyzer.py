@@ -1,7 +1,9 @@
-#from pyvisa.vpp43 import visa_library
-#visa_library.load_library(r"C:\Windows\System32\visa32.dll")
-#import visa
-#instr = visa.instrument("GPIB3::17::INSTR")
+# Find the machine and define it. 
+from pyvisa.vpp43 import visa_library
+visa_library.load_library(r"C:\Windows\System32\visa32.dll")
+import visa
+instr = visa.instrument("GPIB3::17::INSTR")
+
 import os
 import time
 from IPython.core.display import Javascript
@@ -51,9 +53,9 @@ def UI():
     };
 
     function osc_level() {
-        var form = $('<form>').addClass('span3').attr('align', 'right')
+        var form = $('<form>').addClass('span3').attr('align', 'left')
         var field = $('<fieldset>')
-                    .append('<label>Oscillation Level:</label>')
+                    .append('<label>Oscillation Level (Volts):</label>')
                     .append('<input class="osc_level">').attr('type','text')
         return form.append(field)
     };
@@ -104,8 +106,7 @@ def UI():
         return $('<div>').attr('align','right').addClass('sweep_div span3').text('Type of test measurement:')
                 .append($('<select/>').addClass('span3 switch-box').addClass('test_type')
                     .append(($('<option>').val('freq').text('Frequency')))
-                    .append(($('<option>').val('volt').text('Voltage'))))
-                    .append(test_select('Frequency',settings))
+                    .append(($('<option>').val('volt').text('Voltage')))
                     .change(function(){
                         // Changes between test voltage and frequency forms
                         var sel = $('.test_type').val();
@@ -115,7 +116,8 @@ def UI():
                         else if (sel == 'volt') {
                             $('.test_div').replaceWith(test_select('Voltage', settings));
                         }
-                    });
+                    }))
+                    .append(test_select('Frequency',settings));
     };
 
     function test_select(item, settings) {
@@ -131,12 +133,12 @@ def UI():
         var field = $('<fieldset>')
                     .append('<legend>Log Frequency Sweep</legend>')
                     .append('<label>Start Decade</label>')
-                    .append('<input class="start_frequency">').attr('type','text')
+                    .append('<input class="start_Log">').attr('type','text')
                     .append('<label>Stop Decade</label>')
-                    .append('<input class="stop_frequency">').attr('type','text')
+                    .append('<input class="stop_Log">').attr('type','text')
                     .append('<label>Number of Points in Decade</label>')
-                    .append('<input class="step_frequency">').attr('type','text')
-        return $('<div>').addClass('sweep_div').append(form.append(field)).append(run_button(settings, true, 'Frequency'))
+                    .append('<input class="step_Log">').attr('type','text')
+        return $('<div>').addClass('sweep_div').append(form.append(field)).append(run_button(settings, true, 'Log'))
     };
 
     function status() {
@@ -158,7 +160,6 @@ def UI():
                         var value = $(settings[i]).val()
                         IPython.notebook.kernel.execute(value)
                     };
-                    IPython.notebook.kernel.execute('panel["osc_level"]='+$('.osc_level').val())
                     // set the start, stop, and step frequency to 
                     // python dictionary
                     console.log(sweep)
@@ -168,7 +169,7 @@ def UI():
                         console.log(start)
                         IPython.notebook.kernel.execute('sweep["start"]='+start)
                         IPython.notebook.kernel.execute('sweep["sweep_type"]="'+sweep_type+'"')
-                        IPython.notebook.kernel.execute('sweep_data=test_measurement(sweep)');
+                        IPython.notebook.kernel.execute('A,B,C = test_measurement(instr, panel, sweep)');
                     }
                     else if (sweep == null){}
                     else {
@@ -179,8 +180,13 @@ def UI():
                         IPython.notebook.kernel.execute('sweep["stop"]='+stop)
                         IPython.notebook.kernel.execute('sweep["step"]='+step)
                         IPython.notebook.kernel.execute('sweep["sweep_type"]="'+sweep_type+'"')
-                        IPython.notebook.kernel.execute('sweep_data,it=sweep_message(sweep)');
+                        if (sweep_type == 'Log'){
+                            IPython.notebook.kernel.execute('A,B,C = log_sweep(instr, panel, sweep)')
+                        } else {
+                            IPython.notebook.kernel.execute('A,B,C = regular_sweep(instr, panel, sweep)')
+                        }
                     };
+                    IPython.notebook.kernel.execute('panel["osc_level"]='+$('.osc_level').val())
 
                     // grab the front panel settings in python and convert
                     // them to a message for the impedance analyzer
@@ -195,7 +201,7 @@ def UI():
 
     var settings = ['.displayA','.displayB','.circuit','.trigger','.dcbias']
 
-    $('#AnalyzerUI').append('<h3>Impedance Analyzer:</h3>')
+    $('#AnalyzerUI').append('<h3>Impedance Analyzer User Interface:</h3>')
         .append(sweep_select(settings))
         .append(select_box('Display A', 'displayA', ['Z/Y','R/G','L','C'], 4))
         .append(select_box('Display B', 'displayB', ['Rad','Deg'], 2))
@@ -297,7 +303,7 @@ def sweep_message(sweep):
     iteration = int((stop - start)/step)
     return message, iteration
 
-def test_measurement(sweep):
+def test_message(sweep):
     """Creates and returns the string to send
     to the impedance analyzer for test measurements.
 
@@ -365,6 +371,42 @@ def read_message(message, C=False):
     else:
         return A,B
 
+def test_measurement(instr, panel, data):
+    """Runs a test measurment with the analyzer.
+    
+    Parameters
+    ----------
+        instr:
+            The VISA instrument object for the 
+            impedance analyzer.
+        panel: dict
+            A dictionary that holds the settings from
+            the front panel of the machine.
+        data: dict
+            The dictionary that holds all settings
+            for the test measurment.
+        
+    Returns
+    -------
+        A: float
+            The value for display A from the test.
+        B: float
+            The value for display B from the test.
+        C: float
+            The value for display C from the test.
+    """
+    message = grab_settings(panel)
+    test = test_message(data)
+    message = message_to_analyzer(test, message)
+    instr.write(message)
+    m = instr.read()
+    displays = read_message(m, True)
+    A.append(displays[0])
+    B.append(displays[1])
+    C.append(displays[2])
+    return A, B, C
+    
+
 def regular_sweep(instr, panel, sweep):
     """Runs a standard sweep with the analyzer.
     
@@ -372,7 +414,10 @@ def regular_sweep(instr, panel, sweep):
     ----------
         instr:
             The VISA instrument object for the 
-            impedance analyzer
+            impedance analyzer.
+        panel: dict
+            A dictionary that holds the settings from
+            the front panel of the machine.
         sweep: dict
             The dictionary that holds all settings
             for the sweep. (see 'sweep_message docs')
@@ -382,6 +427,8 @@ def regular_sweep(instr, panel, sweep):
             The values for display A from the sweep.
         B: list
             The values for display B from the sweep.
+        C: list
+            The values for display C from the sweep.
     """
     message = grab_settings(panel)
     sweep, i = sweep_message(sweep)
@@ -389,14 +436,38 @@ def regular_sweep(instr, panel, sweep):
     instr.write(message)
     A = []
     B = []
+    C = []
     for j in range(0,i,1):
         m = instr.read()
-        displays = read_message(m,False)
+        displays = read_message(m,True)
         A.append(displays[0])
         B.append(displays[1])
-    return A, B
+        C.append(displays[2])
+    return A, B, C
 
-def log_sweep_plot(n, first_decade, last_decade):
+def log_sweep(n, first_decade, last_decade):
+    """Runs a log sweep between the two given decades.
+    
+    Parameters
+    ----------
+        n: int
+            number of points between each decade in for a log sweep.
+        first_decade: int
+            the decade exponent number to start the sweep.
+            (i.e. 4 if you mean '10^4')
+        last_decade: int
+            the decade exponent number to stop the sweep.
+            (i.e. 4 if you mean '10^4')
+
+    Returns
+    -------
+        A: list
+            The values for display A from the sweep.
+        B: list
+            The values for display B from the sweep.
+        C: list
+            The values for display C from the sweep.
+    """
     A = []
     B = []
     C = []

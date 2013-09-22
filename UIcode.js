@@ -24,9 +24,9 @@ function select_box(name, item, variable, len) {
 };
 
 function osc_level() {
-    var form = $('<form>').addClass('span3').attr('align', 'right')
+    var form = $('<form>').addClass('span3').attr('align', 'left')
     var field = $('<fieldset>')
-                .append('<label>Oscillation Level:</label>')
+                .append('<label>Oscillation Level (Volts):</label>')
                 .append('<input class="osc_level">').attr('type','text')
     return form.append(field)
 };
@@ -77,8 +77,7 @@ function no_sweep(settings) {
     return $('<div>').attr('align','right').addClass('sweep_div span3').text('Type of test measurement:')
             .append($('<select/>').addClass('span3 switch-box').addClass('test_type')
                 .append(($('<option>').val('freq').text('Frequency')))
-                .append(($('<option>').val('volt').text('Voltage'))))
-                .append(test_select('Frequency',settings))
+                .append(($('<option>').val('volt').text('Voltage')))
                 .change(function(){
                     // Changes between test voltage and frequency forms
                     var sel = $('.test_type').val();
@@ -88,14 +87,15 @@ function no_sweep(settings) {
                     else if (sel == 'volt') {
                         $('.test_div').replaceWith(test_select('Voltage', settings));
                     }
-                });
+                }))
+                .append(test_select('Frequency',settings));
 };
 
 function test_select(item, settings) {
     var form = $('<form>').addClass('span2').attr('align', 'center')
     var field = $('<fieldset>')
                 .append('<label>Test '+item+' Value:</label>')
-                .append('<input class="start_"'+item+'>').attr('type','text')
+                .append('<input class="start_'+item+'">').attr('type','text')
     return $('<div>').addClass('test_div').append(form.append(field)).append(run_button(settings, false, item))
 };
 
@@ -104,12 +104,12 @@ function log_sweep(settings) {
     var field = $('<fieldset>')
                 .append('<legend>Log Frequency Sweep</legend>')
                 .append('<label>Start Decade</label>')
-                .append('<input class="start_frequency">').attr('type','text')
+                .append('<input class="start_Log">').attr('type','text')
                 .append('<label>Stop Decade</label>')
-                .append('<input class="stop_frequency">').attr('type','text')
+                .append('<input class="stop_Log">').attr('type','text')
                 .append('<label>Number of Points in Decade</label>')
-                .append('<input class="step_frequency">').attr('type','text')
-    return $('<div>').addClass('sweep_div').append(form.append(field)).append(run_button(settings, true, 'Frequency'))
+                .append('<input class="step_Log">').attr('type','text')
+    return $('<div>').addClass('sweep_div').append(form.append(field)).append(run_button(settings, true, 'Log'))
 };
 
 function status() {
@@ -131,12 +131,16 @@ function run_button(settings, sweep, sweep_type) {
                     var value = $(settings[i]).val()
                     IPython.notebook.kernel.execute(value)
                 };
-
                 // set the start, stop, and step frequency to 
                 // python dictionary
+                console.log(sweep)
                 if (sweep == false) {
+                    console.log('.start_'+sweep_type)
                     var start = $('.start_'+sweep_type).val()
+                    console.log(start)
                     IPython.notebook.kernel.execute('sweep["start"]='+start)
+                    IPython.notebook.kernel.execute('sweep["sweep_type"]="'+sweep_type+'"')
+                    IPython.notebook.kernel.execute('A,B,C = test_measurement(instr, panel, sweep)');
                 }
                 else if (sweep == null){}
                 else {
@@ -147,8 +151,13 @@ function run_button(settings, sweep, sweep_type) {
                     IPython.notebook.kernel.execute('sweep["stop"]='+stop)
                     IPython.notebook.kernel.execute('sweep["step"]='+step)
                     IPython.notebook.kernel.execute('sweep["sweep_type"]="'+sweep_type+'"')
-                    IPython.notebook.kernel.execute('sweep_data,it=sweep_message(sweep)');
+                    if (sweep_type == 'Log'){
+                        IPython.notebook.kernel.execute('A,B,C = log_sweep(instr, panel, sweep)')
+                    } else {
+                        IPython.notebook.kernel.execute('A,B,C = regular_sweep(instr, panel, sweep)')
+                    }
                 };
+                IPython.notebook.kernel.execute('panel["osc_level"]='+$('.osc_level').val())
 
                 // grab the front panel settings in python and convert
                 // them to a message for the impedance analyzer
@@ -158,15 +167,12 @@ function run_button(settings, sweep, sweep_type) {
 };
 
 /*
-
-Here is the building of the UI. The
-
+    This requires a webpage to have a div with id='AnalyzerUI' to build the UI.
 */
 
-var settings = ['.displayA','.displayB','.circuit','.trigger',
-                '.dcbias','.sweep_mode']
+var settings = ['.displayA','.displayB','.circuit','.trigger','.dcbias']
 
-$('#AnalyzerUI').append('<h3>Impedance Analyzer:</h3>')
+$('#AnalyzerUI').append('<h3>Impedance Analyzer User Interface:</h3>')
     .append(sweep_select(settings))
     .append(select_box('Display A', 'displayA', ['Z/Y','R/G','L','C'], 4))
     .append(select_box('Display B', 'displayB', ['Rad','Deg'], 2))
